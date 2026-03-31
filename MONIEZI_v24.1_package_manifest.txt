@@ -1,0 +1,15 @@
+MONIEZI v24.1 package manifest
+
+Purpose: GitHub web upload friendly rebuild of v24 premium PDF foundation.
+
+Key changes:
+- Removed giant generated src/embeddedFonts.ts source file
+- Moved bundled fonts into public/fonts assets
+- App/report fonts still bundled locally with the project
+- PDF engine now fetches OTF font assets for embedding at export time
+- package.json version set to 24.1.0
+
+Package policy:
+- source-only
+- no node_modules
+- no dist

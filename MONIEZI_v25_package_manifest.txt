@@ -1,0 +1,6 @@
+MONIEZI v25 package
+- Premium PDF foundation retained
+- Demo receipt source file de-bloated: images now load from public/demo/receipts instead of giant embedded base64 TypeScript
+- Intended to be Git/GitHub-friendly and source-only
+- No node_modules
+- No dist
