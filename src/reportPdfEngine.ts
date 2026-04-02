@@ -1,10 +1,64 @@
 import fontkit from '@pdf-lib/fontkit';
-import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage, rgb, type Color } from 'pdf-lib';
 import {
   getEmbeddedAppRegularOtf,
   getEmbeddedReportBoldOtf,
   getEmbeddedReportRegularOtf,
 } from './monieziFonts';
+
+/**
+ * pdf-lib does not include drawRoundedRectangle, so we implement it
+ * using drawSvgPath with cubic bezier corners.
+ *
+ * pdf-lib's drawSvgPath uses SVG coordinate space (Y-down) and renders
+ * relative to the (x, y) origin passed in options.  We build the path
+ * in local coordinates starting at (0, 0) = bottom-left of the rect
+ * in PDF space, then set the SVG origin to the rect's PDF (x, y).
+ *
+ * SVG Y is inverted vs PDF Y, so we negate all Y values in the path.
+ */
+const drawRoundedRectangle = (
+  page: PDFPage,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    borderRadius: number;
+    color?: Color;
+    borderColor?: Color;
+    borderWidth?: number;
+  },
+) => {
+  const { x, y, width, height, color, borderColor, borderWidth = 0 } = opts;
+  const r = Math.min(opts.borderRadius, width / 2, height / 2);
+  const k = 0.5522847498; // cubic bezier constant for quarter-circle arcs
+
+  // Path in local coords where (0,0) = bottom-left corner in PDF space.
+  // SVG Y is negated relative to PDF Y.
+  const w = width;
+  const h = height;
+  const path = [
+    `M ${r} 0`,
+    `L ${w - r} 0`,
+    `C ${w - r + r * k} 0 ${w} ${-(r - r * k)} ${w} ${-r}`,
+    `L ${w} ${-(h - r)}`,
+    `C ${w} ${-(h - r + r * k)} ${w - r + r * k} ${-h} ${w - r} ${-h}`,
+    `L ${r} ${-h}`,
+    `C ${r - r * k} ${-h} 0 ${-(h - r + r * k)} 0 ${-(h - r)}`,
+    `L 0 ${-r}`,
+    `C 0 ${-(r - r * k)} ${r - r * k} 0 ${r} 0`,
+    'Z',
+  ].join(' ');
+
+  page.drawSvgPath(path, {
+    x,
+    y: y + height,
+    color,
+    borderColor: borderWidth > 0 ? borderColor : undefined,
+    borderWidth: borderWidth > 0 ? borderWidth : undefined,
+  });
+};
 
 export interface ExpenseSummaryRow {
   name: string;
@@ -128,14 +182,14 @@ const drawLabelValueCard = (
   bodyFont: PDFFont,
   boldFont: PDFFont,
 ) => {
-  page.drawRoundedRectangle({ x, y: yTop - height, width, height, borderRadius: 16, borderWidth: 1, borderColor: COLORS.panelBorder, color: rgb(1, 1, 1) });
+  drawRoundedRectangle(page, { x, y: yTop - height, width, height, borderRadius: 16, borderWidth: 1, borderColor: COLORS.panelBorder, color: rgb(1, 1, 1) });
   page.drawText(label.toUpperCase(), { x: x + 16, y: yTop - 30, size: 8.8, font: boldFont, color: COLORS.textSoft, characterSpacing: 1.6 });
   page.drawText(value, { x: x + 16, y: yTop - 66, size: 22, font: boldFont, color: COLORS.text });
   drawTextBlock(page, note, x + 16, yTop - 86, width - 32, bodyFont, 7.5, COLORS.textSoft, 2.5);
 };
 
 const drawMetaCard = (page: PDFPage, x: number, yTop: number, width: number, height: number, label: string, value: string, bodyFont: PDFFont, boldFont: PDFFont) => {
-  page.drawRoundedRectangle({ x, y: yTop - height, width, height, borderRadius: 14, borderWidth: 1, borderColor: COLORS.panelBorder, color: COLORS.blueTint });
+  drawRoundedRectangle(page, { x, y: yTop - height, width, height, borderRadius: 14, borderWidth: 1, borderColor: COLORS.panelBorder, color: COLORS.blueTint });
   page.drawText(label.toUpperCase(), { x: x + 14, y: yTop - 22, size: 7.8, font: boldFont, color: COLORS.textSoft, characterSpacing: 1.8 });
   const lines = splitWords(value, boldFont, 11, width - 28);
   let lineY = yTop - 52;
@@ -146,8 +200,8 @@ const drawMetaCard = (page: PDFPage, x: number, yTop: number, width: number, hei
 };
 
 const drawSectionShell = (page: PDFPage, x: number, yTop: number, width: number, height: number, sectionNo: string, title: string, subtitle: string, bodyFont: PDFFont, boldFont: PDFFont) => {
-  page.drawRoundedRectangle({ x, y: yTop - height, width, height, borderRadius: 20, borderWidth: 1, borderColor: COLORS.panelBorder, color: rgb(1, 1, 1) });
-  page.drawRoundedRectangle({ x, y: yTop - 86, width, height: 86, borderRadius: 20, color: COLORS.panel, borderColor: COLORS.panelBorder, borderWidth: 0 });
+  drawRoundedRectangle(page, { x, y: yTop - height, width, height, borderRadius: 20, borderWidth: 1, borderColor: COLORS.panelBorder, color: rgb(1, 1, 1) });
+  drawRoundedRectangle(page, { x, y: yTop - 86, width, height: 86, borderRadius: 20, color: COLORS.panel, borderColor: COLORS.panelBorder, borderWidth: 0 });
   page.drawText(`SECTION ${sectionNo}`, { x: x + 18, y: yTop - 28, size: 8.8, font: boldFont, color: COLORS.blue, characterSpacing: 1.6 });
   page.drawText(title, { x: x + 18, y: yTop - 58, size: 15, font: boldFont, color: COLORS.text });
   page.drawText(subtitle, { x: x + 18, y: yTop - 76, size: 7.7, font: bodyFont, color: COLORS.textSoft });
@@ -183,16 +237,16 @@ const drawProgressRow = (page: PDFPage, x: number, yTop: number, width: number, 
   const tone = progressTone(value);
   page.drawText(label, { x, y: yTop - 16, size: 8.4, font: boldFont, color: COLORS.text });
   page.drawText(detail, { x, y: yTop - 30, size: 7.2, font: bodyFont, color: COLORS.textSoft });
-  page.drawRoundedRectangle({ x: x + width - 48, y: yTop - 24, width: 48, height: 20, borderRadius: 10, color: tone.pill });
+  drawRoundedRectangle(page, { x: x + width - 48, y: yTop - 24, width: 48, height: 20, borderRadius: 10, color: tone.pill });
   const pct = formatPercent(value);
   const pctWidth = boldFont.widthOfTextAtSize(pct, 8.2);
   page.drawText(pct, { x: x + width - 24 - pctWidth / 2, y: yTop - 17, size: 8.2, font: boldFont, color: tone.text });
-  page.drawRoundedRectangle({ x, y: yTop - 46, width, height: 8, borderRadius: 4, color: tone.track });
-  page.drawRoundedRectangle({ x, y: yTop - 46, width: Math.max(24, width * Math.max(0, Math.min(1, value / 100))), height: 8, borderRadius: 4, color: tone.bar });
+  drawRoundedRectangle(page, { x, y: yTop - 46, width, height: 8, borderRadius: 4, color: tone.track });
+  drawRoundedRectangle(page, { x, y: yTop - 46, width: Math.max(24, width * Math.max(0, Math.min(1, value / 100))), height: 8, borderRadius: 4, color: tone.bar });
 };
 
 const drawMiniStat = (page: PDFPage, x: number, yTop: number, width: number, height: number, label: string, value: string, note: string, bodyFont: PDFFont, boldFont: PDFFont) => {
-  page.drawRoundedRectangle({ x, y: yTop - height, width, height, borderRadius: 16, borderWidth: 1, borderColor: COLORS.panelBorder, color: rgb(1,1,1) });
+  drawRoundedRectangle(page, { x, y: yTop - height, width, height, borderRadius: 16, borderWidth: 1, borderColor: COLORS.panelBorder, color: rgb(1,1,1) });
   page.drawText(label.toUpperCase(), { x: x + 16, y: yTop - 24, size: 8.2, font: boldFont, color: COLORS.textSoft, characterSpacing: 1.5 });
   page.drawText(value, { x: x + 16, y: yTop - 58, size: 20, font: boldFont, color: COLORS.text });
   drawTextBlock(page, note, x + 16, yTop - 76, width - 32, bodyFont, 7.1, COLORS.textSoft, 2.2);
@@ -378,7 +432,7 @@ export async function generateTaxSummaryPdfBytes(raw: TaxSummaryPdfData): Promis
   });
 
   const closingTop = pageHeight - 468;
-  page3.drawRoundedRectangle({ x: margin, y: closingTop - 120, width: contentWidth, height: 120, borderRadius: 18, borderWidth: 1, borderColor: COLORS.panelBorder, color: COLORS.panel });
+  drawRoundedRectangle(page3, { x: margin, y: closingTop - 120, width: contentWidth, height: 120, borderRadius: 18, borderWidth: 1, borderColor: COLORS.panelBorder, color: COLORS.panel });
   page3.drawText('Pre-Filing Note', { x: margin + 18, y: closingTop - 28, size: 12.5, font: boldFont, color: COLORS.text });
   drawTextBlock(page3, 'MONIEZI organized this package from your recorded ledger entries, linked receipt attachments, and mileage logs for the selected tax year. The totals here are designed to make the value of your records immediately clear: what you earned, what you spent, how well expenses are documented, and what should be addressed before filing. Final tax treatment, classification decisions, and any required adjustments should still be reviewed with your tax professional.', margin + 18, closingTop - 44, contentWidth - 36, bodyFont, 9.2, COLORS.textSoft, 4.2);
 
