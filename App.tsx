@@ -136,6 +136,16 @@ const fetchDemoReceiptBlob = async (asset: { assetUrl: string; mimeType: string 
 };
 
 
+const formatDateForUsCsv = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  });
+};
+
 const normalize = (s: string) => (s || '').trim().toLowerCase();
 
 // --- Utility: Image Compressor ---
@@ -4282,7 +4292,7 @@ const demoMileageTrips: MileageTrip[] = [
       ...txForTaxYear
         .slice()
         .sort((a, b) => a.date.localeCompare(b.date))
-        .map(t => [t.date, t.type, t.name, t.category, t.amount, t.notes || '', (t as any).receiptId || ''])
+        .map(t => [formatDateForUsCsv(t.date), t.type, t.name, t.category, t.amount, t.notes || '', (t as any).receiptId || ''])
     ];
     downloadBlob(makeCsvBlob(rows), `MONIEZI_TaxLedger_${taxPrepYear}.csv`);
     showToast(`Exported Tax Ledger CSV for ${taxPrepYear}`, 'success');
@@ -4297,7 +4307,7 @@ const demoMileageTrips: MileageTrip[] = [
         .sort((a, b) => a.date.localeCompare(b.date))
         .map(t => {
           const deduction = (Number(t.miles) * (rateCents / 100));
-          return [t.date, t.miles, rateCents, deduction.toFixed(2), t.purpose, t.client || '', t.notes || ''];
+          return [formatDateForUsCsv(t.date), t.miles, rateCents, deduction.toFixed(2), t.purpose, t.client || '', t.notes || ''];
         })
     ];
     downloadBlob(makeCsvBlob(rows), `MONIEZI_Mileage_${taxPrepYear}.csv`);

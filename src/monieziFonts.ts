@@ -1,17 +1,26 @@
+import appRegularWoff2Url from './assets/fonts/moniezi-app-regular.woff2';
+import appBoldWoff2Url from './assets/fonts/moniezi-app-bold.woff2';
+import reportRegularWoff2Url from './assets/fonts/moniezi-report-regular.woff2';
+import reportBoldWoff2Url from './assets/fonts/moniezi-report-bold.woff2';
+import appRegularOtfUrl from './assets/fonts/moniezi-app-regular.otf';
+import appBoldOtfUrl from './assets/fonts/moniezi-app-bold.otf';
+import reportRegularOtfUrl from './assets/fonts/moniezi-report-regular.otf';
+import reportBoldOtfUrl from './assets/fonts/moniezi-report-bold.otf';
+
 const FONT_STYLE_ID = 'moniezi-embedded-fonts';
 
 const FONT_URLS = {
-  appRegularWoff2: '/fonts/moniezi-app-regular.woff2',
-  appBoldWoff2: '/fonts/moniezi-app-bold.woff2',
-  reportRegularWoff2: '/fonts/moniezi-report-regular.woff2',
-  reportBoldWoff2: '/fonts/moniezi-report-bold.woff2',
-  appRegularOtf: '/fonts/moniezi-app-regular.otf',
-  appBoldOtf: '/fonts/moniezi-app-bold.otf',
-  reportRegularOtf: '/fonts/moniezi-report-regular.otf',
-  reportBoldOtf: '/fonts/moniezi-report-bold.otf',
+  appRegularWoff2: appRegularWoff2Url,
+  appBoldWoff2: appBoldWoff2Url,
+  reportRegularWoff2: reportRegularWoff2Url,
+  reportBoldWoff2: reportBoldWoff2Url,
+  appRegularOtf: appRegularOtfUrl,
+  appBoldOtf: appBoldOtfUrl,
+  reportRegularOtf: reportRegularOtfUrl,
+  reportBoldOtf: reportBoldOtfUrl,
 } as const;
 
-const fontFaceCss = `
+const buildFontFaceCss = () => `
 @font-face {
   font-family: 'MonieziApp';
   src: url(${FONT_URLS.appRegularWoff2}) format('woff2');
@@ -60,10 +69,15 @@ html body,
 
 export const installMonieziFonts = () => {
   if (typeof document === 'undefined') return;
-  if (document.getElementById(FONT_STYLE_ID)) return;
+  const css = buildFontFaceCss();
+  const existing = document.getElementById(FONT_STYLE_ID) as HTMLStyleElement | null;
+  if (existing) {
+    if (existing.textContent !== css) existing.textContent = css;
+    return;
+  }
   const style = document.createElement('style');
   style.id = FONT_STYLE_ID;
-  style.textContent = fontFaceCss;
+  style.textContent = css;
   document.head.appendChild(style);
 };
 
@@ -86,7 +100,7 @@ let reportRegularOtfPromise: Promise<Uint8Array> | null = null;
 let reportBoldOtfPromise: Promise<Uint8Array> | null = null;
 
 const fetchFontBytes = async (url: string) => {
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: 'force-cache' });
   if (!response.ok) throw new Error(`Failed to load font asset: ${url}`);
   return new Uint8Array(await response.arrayBuffer());
 };

@@ -1,5 +1,0 @@
-MONIEZI v25.1 package
-- Fixed package-lock.json registry URLs to public npm registry
-- Updated package version to 25.1.0
-- Premium PDF foundation retained
-- Slim source-only package
