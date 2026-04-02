@@ -74,9 +74,18 @@ const COLORS = {
   yellow: rgb(0.92, 0.64, 0.14),
 };
 
-const formatCurrency = (symbol: string, value: number) => `${symbol}${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const formatNumber = (value: number, decimals = 0) => Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-const formatPercent = (value: number) => `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: value % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 })}%`;
+const sanitizeForPdf = (text: string) =>
+  text
+    .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+    .replace(/\u2212/g, '-')
+    .replace(/\u2013/g, '-')
+    .replace(/\u2014/g, '-')
+    .replace(/\u00B7/g, '|')
+    .replace(/[^\x20-\x7E]/g, '');
+
+const formatCurrency = (symbol: string, value: number) => sanitizeForPdf(`${symbol}${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+const formatNumber = (value: number, decimals = 0) => sanitizeForPdf(Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }));
+const formatPercent = (value: number) => sanitizeForPdf(`${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: value % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 })}%`);
 
 const splitWords = (text: string, font: PDFFont, size: number, maxWidth: number) => {
   const lines: string[] = [];
@@ -97,7 +106,7 @@ const splitWords = (text: string, font: PDFFont, size: number, maxWidth: number)
 };
 
 const drawTextBlock = (page: PDFPage, text: string, x: number, yTop: number, width: number, font: PDFFont, size: number, color = COLORS.textSoft, lineGap = 4) => {
-  const lines = splitWords(text, font, size, width);
+  const lines = splitWords(sanitizeForPdf(text), font, size, width);
   const lineHeight = size + lineGap;
   let y = yTop - size;
   lines.forEach(line => {
@@ -231,7 +240,18 @@ const drawTable = (
   });
 };
 
-export async function generateTaxSummaryPdfBytes(data: TaxSummaryPdfData): Promise<Uint8Array> {
+export async function generateTaxSummaryPdfBytes(raw: TaxSummaryPdfData): Promise<Uint8Array> {
+  const data: TaxSummaryPdfData = {
+    ...raw,
+    businessName: sanitizeForPdf(raw.businessName),
+    ownerName: sanitizeForPdf(raw.ownerName),
+    generatedAtLabel: sanitizeForPdf(raw.generatedAtLabel),
+    reportingPeriodLabel: sanitizeForPdf(raw.reportingPeriodLabel),
+    topExpenseCategoryName: sanitizeForPdf(raw.topExpenseCategoryName),
+    currencySymbol: sanitizeForPdf(raw.currencySymbol),
+    expenseRows: raw.expenseRows.map(r => ({ ...r, name: sanitizeForPdf(r.name) })),
+    attentionItems: raw.attentionItems.map(s => sanitizeForPdf(s)),
+  };
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
   const [reportRegularOtf, reportBoldOtf, appRegularOtf] = await Promise.all([
@@ -255,7 +275,7 @@ export async function generateTaxSummaryPdfBytes(data: TaxSummaryPdfData): Promi
     { label: 'Ledger Transactions', value: formatNumber(data.ledgerTransactions), note: 'Income and expense entries included in this year-end package.' },
     { label: 'Linked Receipts', value: formatNumber(data.linkedReceipts), note: 'Receipt-backed expenses currently attached inside MONIEZI.' },
     { label: 'Expense Categories', value: formatNumber(data.expenseCategoriesCount), note: 'Distinct deduction buckets used in this tax year.' },
-    { label: 'Top Expense Category', value: data.topExpenseCategoryName || '—', note: data.topExpenseCategoryName ? `${formatCurrency(data.currencySymbol, data.topExpenseCategoryAmount)} · ${formatPercent(data.topExpenseCategorySharePct)} of expenses` : 'No expense activity recorded for this period.' },
+    { label: 'Top Expense Category', value: data.topExpenseCategoryName || '-', note: data.topExpenseCategoryName ? `${formatCurrency(data.currencySymbol, data.topExpenseCategoryAmount)} | ${formatPercent(data.topExpenseCategorySharePct)} of expenses` : 'No expense activity recorded for this period.' },
   ];
 
   // Page 1
@@ -302,7 +322,7 @@ export async function generateTaxSummaryPdfBytes(data: TaxSummaryPdfData): Promi
   drawSectionShell(page2, margin, section2Top, contentWidth, 272, '2', 'Audit Readiness & Documentation Status', 'A quick view of how complete and organized your records look before filing.', bodyFont, boldFont);
   const progressBaseY = section2Top - 104;
   drawProgressRow(page2, margin + 18, progressBaseY, contentWidth - 36, 'Receipt Coverage', `${formatNumber(data.linkedReceipts)} linked receipts across ${formatNumber(data.expenseItemsCount)} deductible expense items.`, data.receiptCoveragePct, bodyFont, boldFont);
-  drawProgressRow(page2, margin + 18, progressBaseY - 74, contentWidth - 36, 'Expense Review Status', `${formatNumber(data.reviewedExpenseCount)} reviewed · ${formatNumber(data.pendingReviewCount)} pending review.`, data.reviewCoveragePct, bodyFont, boldFont);
+  drawProgressRow(page2, margin + 18, progressBaseY - 74, contentWidth - 36, 'Expense Review Status', `${formatNumber(data.reviewedExpenseCount)} reviewed | ${formatNumber(data.pendingReviewCount)} pending review.`, data.reviewCoveragePct, bodyFont, boldFont);
   drawProgressRow(page2, margin + 18, progressBaseY - 148, contentWidth - 36, 'Mileage Log Completeness', `${formatNumber(data.completeMileageCount)} complete trip entries recorded for ${formatNumber(data.totalMiles, 1)} business miles.`, data.mileageCompletionPct, bodyFont, boldFont);
   const miniTop = section2Top - 222;
   const miniGap = 14;
@@ -363,8 +383,8 @@ export async function generateTaxSummaryPdfBytes(data: TaxSummaryPdfData): Promi
   drawTextBlock(page3, 'MONIEZI organized this package from your recorded ledger entries, linked receipt attachments, and mileage logs for the selected tax year. The totals here are designed to make the value of your records immediately clear: what you earned, what you spent, how well expenses are documented, and what should be addressed before filing. Final tax treatment, classification decisions, and any required adjustments should still be reviewed with your tax professional.', margin + 18, closingTop - 44, contentWidth - 36, bodyFont, 9.2, COLORS.textSoft, 4.2);
 
   page3.drawLine({ start: { x: margin, y: margin + 18 }, end: { x: pageWidth - margin, y: margin + 18 }, thickness: 1, color: COLORS.line });
-  page3.drawText('MONIEZI Pro Finance · Generated privately from your local business records.', { x: margin, y: margin, size: 9.2, font: boldFont, color: COLORS.textSoft });
-  const footerRight = `${data.businessName} · Tax Year ${data.taxYear}`;
+  page3.drawText('MONIEZI Pro Finance | Generated privately from your local business records.', { x: margin, y: margin, size: 9.2, font: boldFont, color: COLORS.textSoft });
+  const footerRight = `${data.businessName} | Tax Year ${data.taxYear}`;
   const footerWidth = bodyFont.widthOfTextAtSize(footerRight, 9.2);
   page3.drawText(footerRight, { x: pageWidth - margin - footerWidth, y: margin, size: 9.2, font: bodyFont, color: COLORS.textSoft });
 

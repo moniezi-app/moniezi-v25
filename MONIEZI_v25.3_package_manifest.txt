@@ -1,5 +1,0 @@
-MONIEZI v25.3 package
-- Fix Tax Summary PDF export font asset loading by importing fonts through Vite assets
-- Fix demo receipt thumbnails by importing receipt images through Vite assets
-- Keep U.S. CSV date formatting helper explicitly defined (MM/DD/YYYY)
-- Slim source-only package

@@ -1,0 +1,6 @@
+MONIEZI v25.4 package
+- Fix Tax Summary PDF export crash caused by non-ASCII Unicode characters in embedded font subsets
+- Sanitize all text rendered into PDF (locale-dependent toLocaleString output, en-dash, em-dash, middle dot)
+- Pin formatCurrency/formatNumber/formatPercent to en-US locale for deterministic output
+- Sanitize all dynamic string inputs (business name, category names, attention items) at PDF generation entry point
+- Slim source-only package

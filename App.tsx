@@ -4441,7 +4441,7 @@ const demoMileageTrips: MileageTrip[] = [
       hour: 'numeric',
       minute: '2-digit',
     });
-    const reportingPeriodLabel = `${new Date(reportingStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(reportingEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    const reportingPeriodLabel = `${new Date(reportingStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${new Date(reportingEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
     const pdfData: TaxSummaryPdfData = {
       taxYear: String(taxPrepYear),
@@ -4459,7 +4459,7 @@ const demoMileageTrips: MileageTrip[] = [
       ledgerTransactions: txForTaxYear.length,
       linkedReceipts: linkedReceiptExpenses.length,
       expenseCategoriesCount: uniqueExpenseCategories.length,
-      topExpenseCategoryName: topExpenseCategory?.name || '—',
+      topExpenseCategoryName: topExpenseCategory?.name || '-',
       topExpenseCategoryAmount: topExpenseCategory?.amount || 0,
       topExpenseCategorySharePct: totalExpenses > 0 && topExpenseCategory ? (topExpenseCategory.amount / totalExpenses) * 100 : 0,
       receiptCoveragePct,
